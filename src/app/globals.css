@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --animate-fade-in: fade-in 0.5s ease-out both;
+  --animate-breathe: breathe 4s ease-in-out infinite;
+  --animate-talk: talk 0.9s ease-in-out infinite;
+  --animate-ripple: ripple 2s ease-out infinite;
+  --animate-spin-slow: spin 6s linear infinite;
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+  }
+  @keyframes talk {
+    0%, 100% { transform: scale(1); }
+    30% { transform: scale(1.09); }
+    60% { transform: scale(0.98); }
+  }
+  @keyframes ripple {
+    from { transform: scale(1); opacity: 0.6; }
+    to { transform: scale(1.6); opacity: 0; }
+  }
+}
+
+html { color-scheme: dark; }
+
+body {
+  @apply bg-zinc-950 text-zinc-100 antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+}
