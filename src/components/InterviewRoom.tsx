@@ -4,22 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { useSpeaker } from "@/hooks/useSpeaker";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import type { InterviewSetup, Turn } from "@/lib/types";
+import InterviewResult from "./InterviewResult";
+import Transcript from "./Transcript";
 import Orb, { type OrbState } from "./Orb";
 
 type Phase = "thinking" | "speaking" | "answering" | "error" | "done";
 
 function formatTime(seconds: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-}
-
-function downloadTranscript(setup: InterviewSetup, transcript: Turn[]) {
-  const name = setup.candidateName || "Candidate";
-  const lines = transcript.map((t) => `${t.role === "interviewer" ? "Maya (Interviewer)" : name}:\n${t.text}\n`);
-  const blob = new Blob([`InterviewPilot transcript\n\n${lines.join("\n")}`], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = Object.assign(document.createElement("a"), { href: url, download: "interview-transcript.txt" });
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 export default function InterviewRoom({ setup, onExit }: { setup: InterviewSetup; onExit: () => void }) {
@@ -41,6 +33,7 @@ export default function InterviewRoom({ setup, onExit }: { setup: InterviewSetup
   const endedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const retryRef = useRef<Turn[]>([]);
+  const answerStartRef = useRef(0);
   const typingRef = useRef(typing);
   typingRef.current = typing;
 
@@ -115,7 +108,9 @@ export default function InterviewRoom({ setup, onExit }: { setup: InterviewSetup
     }
     setPhase("answering");
     setDraft("");
-    if (recognizer.supported && !typingRef.current) recognizer.start();
+    answerStartRef.current = Date.now();
+    // start() checks browser support itself; the `supported` state may be stale in this closure on the first turn.
+    if (!typingRef.current) recognizer.start();
   }
 
   function submitAnswer() {
@@ -126,7 +121,10 @@ export default function InterviewRoom({ setup, onExit }: { setup: InterviewSetup
       if (!typing) recognizer.start();
       return;
     }
-    interviewerTurn([...transcript, { role: "candidate", text: answer }]);
+    const answerTurn: Turn = typing
+      ? { role: "candidate", text: answer, mode: "text" }
+      : { role: "candidate", text: answer, mode: "voice", durationSec: Math.round((Date.now() - answerStartRef.current) / 1000) };
+    interviewerTurn([...transcript, answerTurn]);
   }
 
   function toggleTyping() {
@@ -196,36 +194,7 @@ export default function InterviewRoom({ setup, onExit }: { setup: InterviewSetup
               : "idle";
 
   if (phase === "done") {
-    const answers = transcript.filter((t) => t.role === "candidate").length;
-    return (
-      <div className="mx-auto max-w-3xl animate-fade-in space-y-8 py-10">
-        <div className="flex flex-col items-center text-center">
-          <Orb state="done" size={112} />
-          <h2 className="mt-4 text-3xl font-bold">Interview complete 🎉</h2>
-          <p className="mt-2 text-zinc-400">
-            {answers} answers · {formatTime(seconds)} · {setup.language === "ar" ? "Arabic" : "English"}
-          </p>
-          <p className="mt-4 rounded-full border border-violet-400/30 bg-violet-500/10 px-4 py-1.5 text-sm text-violet-200">
-            Your AI scorecard is coming in the next update
-          </p>
-        </div>
-        <div className="flex flex-col justify-center gap-3 sm:flex-row">
-          <button
-            onClick={() => downloadTranscript(setup, transcript)}
-            className="rounded-xl border border-white/15 px-6 py-3 font-medium transition hover:bg-white/5"
-          >
-            Download transcript
-          </button>
-          <button
-            onClick={onExit}
-            className="rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-6 py-3 font-semibold shadow-lg shadow-violet-500/25 transition hover:brightness-110"
-          >
-            New interview
-          </button>
-        </div>
-        <Transcript transcript={transcript} setup={setup} dir={dir} />
-      </div>
-    );
+    return <InterviewResult setup={setup} transcript={transcript} seconds={seconds} onExit={onExit} />;
   }
 
   return (
@@ -345,27 +314,5 @@ export default function InterviewRoom({ setup, onExit }: { setup: InterviewSetup
         </details>
       )}
     </div>
-  );
-}
-
-function Transcript({ transcript, setup, dir }: { transcript: Turn[]; setup: InterviewSetup; dir: "rtl" | "ltr" }) {
-  return (
-    <ol className="space-y-4">
-      {transcript.map((t, i) => (
-        <li key={i} className={`flex ${t.role === "candidate" ? "justify-end" : "justify-start"}`}>
-          <div
-            dir={dir}
-            className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-              t.role === "candidate" ? "bg-emerald-500/15 text-emerald-50" : "bg-violet-500/15 text-violet-50"
-            }`}
-          >
-            <p className="mb-1 text-xs font-semibold opacity-60">
-              {t.role === "interviewer" ? "Maya" : setup.candidateName || "You"}
-            </p>
-            {t.text}
-          </div>
-        </li>
-      ))}
-    </ol>
   );
 }

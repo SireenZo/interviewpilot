@@ -37,3 +37,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
 }
+
+@media print {
+  html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  header, footer, nextjs-portal { display: none !important; }
+  details > *:not(summary) { display: block !important; }
+}

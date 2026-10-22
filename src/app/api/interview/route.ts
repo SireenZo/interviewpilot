@@ -2,7 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { demoTurn } from "@/lib/demo";
 import { buildMessages, INTERVIEWER_SYSTEM, isFinalTurn } from "@/lib/prompts";
-import { LIMITS, interviewProgress, type InterviewRequest, type InterviewSetup, type Turn } from "@/lib/types";
+import { interviewProgress, type InterviewRequest } from "@/lib/types";
+import { parseSetup, parseTranscript } from "@/lib/validate";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -18,34 +19,13 @@ function fail(error: string, status: number) {
 
 function validate(body: unknown): InterviewRequest | string {
   const b = body as Partial<InterviewRequest> | null;
-  const s = b?.setup as Partial<InterviewSetup> | undefined;
-  if (!s || !Array.isArray(b?.transcript)) return "Invalid request.";
-  if (typeof s.jobText !== "string" || !s.jobText.trim()) return "Please add a job description.";
-  if (typeof s.cvText !== "string" || !s.cvText.trim()) return "Please add your CV.";
-  if (s.jobText.length > LIMITS.text || s.cvText.length > LIMITS.text) return "CV or job description is too long.";
-  if (s.language !== "en" && s.language !== "ar") return "Unsupported language.";
-  if (typeof s.questionCount !== "number" || s.questionCount < 2 || s.questionCount > 10) return "Invalid interview length.";
-
-  const transcript = b.transcript as Turn[];
-  if (transcript.length > LIMITS.turns) return "This interview is too long.";
-  for (let i = 0; i < transcript.length; i++) {
-    const t = transcript[i];
-    const expected = i % 2 === 0 ? "interviewer" : "candidate";
-    if (t?.role !== expected || typeof t.text !== "string" || t.text.length > LIMITS.answer) return "Invalid transcript.";
-  }
+  const setup = parseSetup(b?.setup);
+  if (typeof setup === "string") return setup;
+  const transcript = parseTranscript(b?.transcript);
+  if (typeof transcript === "string") return transcript;
   // The client asks for the next interviewer turn only after the candidate has answered (or at the very start).
   if (transcript.length % 2 !== 0) return "Waiting for the candidate's answer.";
-
-  return {
-    setup: {
-      candidateName: String(s.candidateName ?? "").slice(0, 80),
-      cvText: s.cvText,
-      jobText: s.jobText,
-      language: s.language,
-      questionCount: s.questionCount,
-    },
-    transcript,
-  };
+  return { setup, transcript };
 }
 
 function textStream(final: boolean, produce: (write: (text: string) => void) => Promise<void>) {

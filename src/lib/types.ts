@@ -1,6 +1,12 @@
 export type Lang = "en" | "ar";
 
-export type Turn = { role: "interviewer" | "candidate"; text: string };
+export type Turn = {
+  role: "interviewer" | "candidate";
+  text: string;
+  /** Candidate turns only: how the answer was given, and how long it was spoken for. */
+  mode?: "voice" | "text";
+  durationSec?: number;
+};
 
 export type InterviewSetup = {
   candidateName: string;

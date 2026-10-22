@@ -71,16 +71,28 @@ export function useSpeechRecognition(lang: string) {
         setError("No microphone was found, so you can type your answers.");
       }
     };
+    let startedAt = Date.now();
+    let quickEnds = 0;
+    const unavailable = "We couldn't use your microphone, so you can type your answers.";
     rec.onend = () => {
       // Browsers end recognition after a pause; restart it while the candidate is still answering.
       if (wantRef.current) {
         finalRef.current += interimRef.current ? interimRef.current + " " : "";
         interimRef.current = "";
-        try {
-          rec.start();
-          return;
-        } catch {
-          // Fall through and report that listening stopped.
+        // Some browsers block the mic silently: recognition ends instantly without an error. Don't loop forever.
+        quickEnds = Date.now() - startedAt < 1000 && !finalRef.current ? quickEnds + 1 : 0;
+        if (quickEnds >= 3) {
+          wantRef.current = false;
+          setError(unavailable);
+        } else {
+          try {
+            startedAt = Date.now();
+            rec.start();
+            return;
+          } catch {
+            wantRef.current = false;
+            setError(unavailable);
+          }
         }
       }
       setListening(false);
