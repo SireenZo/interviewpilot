@@ -7,7 +7,11 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ??
+      // Set automatically on Vercel, so share-link previews work without extra configuration.
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000"),
+  ),
   title: "InterviewPilot: AI Voice Mock Interviews",
   description:
     "Practice real job interviews out loud with an AI interviewer that reads your CV, asks follow-ups, runs a live coding round and scores you. English or Arabic.",
