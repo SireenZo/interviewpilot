@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ScorecardResult } from "@/lib/scorecard";
 import type { InterviewSetup, Turn } from "@/lib/types";
@@ -40,6 +41,7 @@ export default function InterviewResult({
   seconds: number;
   onExit: () => void;
 }) {
+  const router = useRouter();
   const answered = transcript.some((t) => t.role === "candidate");
   const [result, setResult] = useState<ScorecardResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,13 +58,15 @@ export default function InterviewResult({
     fetch("/api/scorecard", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ setup, transcript }),
+      body: JSON.stringify({ setup, transcript, durationSec: seconds }),
       signal: controller.signal,
     })
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
-        setResult(data);
+        // Signed-in users' interviews are saved: open the saved scorecard, which can be shared.
+        if (data.id) router.push(`/interviews/${data.id}`);
+        else setResult(data);
       })
       .catch((e) => {
         if (controller.signal.aborted) return;
@@ -73,7 +77,9 @@ export default function InterviewResult({
       controller.abort();
       clearInterval(timer);
     };
-  }, [answered, setup, transcript, attempt]);
+    // `seconds` is fixed once the interview has ended, so it doesn't need to re-trigger grading.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answered, setup, transcript, attempt, router]);
 
   const actions = (
     <>
@@ -98,6 +104,16 @@ export default function InterviewResult({
             <p className="text-sm uppercase tracking-widest text-zinc-500">Interview scorecard · {Math.floor(seconds / 60)} min</p>
             <h2 className="mt-1 text-3xl font-bold">{setup.candidateName ? `${setup.candidateName}'s results` : "Your results"}</h2>
           </div>
+          <a
+            href="/signin?callbackUrl=/dashboard"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-400/30 bg-violet-500/10 px-5 py-4 transition hover:bg-violet-500/15 print:hidden"
+          >
+            <span>
+              <span className="block font-semibold">Save your results and track your progress</span>
+              <span className="block text-sm text-zinc-400">Sign in for real AI interviews, history, and shareable scorecards.</span>
+            </span>
+            <span className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold">Sign in →</span>
+          </a>
           <ScorecardView result={result} transcript={transcript} language={setup.language} actions={actions} />
           <details className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 print:hidden">
             <summary className="cursor-pointer text-sm font-medium text-zinc-400">Full transcript</summary>

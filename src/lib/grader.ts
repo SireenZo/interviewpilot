@@ -27,7 +27,15 @@ function formatTranscript(transcript: Turn[], setup: InterviewSetup) {
   const name = setup.candidateName || "Candidate";
   let answerIndex = 0;
   return transcript
-    .map((t) => (t.role === "interviewer" ? `Interviewer: ${t.text}` : `${name} [answer ${answerIndex++}]: ${t.text}`))
+    .map((t) => {
+      if (t.role === "interviewer") {
+        return t.coding
+          ? `Interviewer: ${t.text}\n[Coding exercise: ${t.coding.title} (${t.coding.language})]\n${t.coding.problem}`
+          : `Interviewer: ${t.text}`;
+      }
+      const code = t.code ? `\n[Submitted code]\n${t.code}` : "";
+      return `${name} [answer ${answerIndex++}]: ${t.text}${code}`;
+    })
     .join("\n\n");
 }
 
@@ -72,6 +80,16 @@ export function demoScorecard(transcript: Turn[], metrics: DeliveryMetrics): Sco
       "Quantify impact with numbers wherever you can.",
       "Explain why you chose one approach over the alternatives.",
     ],
+    coding: transcript.some((t) => t.coding)
+      ? {
+          score: 70,
+          correctness: "The core idea of resetting a timer on every call is right; check that the latest arguments are the ones passed through.",
+          quality: "Readable and short. Typing the returned function and clearing the timer in cancel() would make it production-ready.",
+          communication: "You explained the timer approach clearly; mention edge cases such as calling cancel() before the timer fires.",
+          suggestedSolution:
+            "function debounce<T extends (...args: any[]) => void>(fn: T, waitMs: number) {\n  let timer: ReturnType<typeof setTimeout> | undefined;\n  const debounced = (...args: Parameters<T>) => {\n    clearTimeout(timer);\n    timer = setTimeout(() => fn(...args), waitMs);\n  };\n  debounced.cancel = () => clearTimeout(timer);\n  return debounced;\n}",
+        }
+      : null,
     practicePlan: [
       "Write STAR versions of your three best project stories and say each one out loud in under 2 minutes.",
       "For each project on your CV, note one number that shows impact (users, speed, time saved).",
@@ -80,12 +98,12 @@ export function demoScorecard(transcript: Turn[], metrics: DeliveryMetrics): Sco
   };
 }
 
-export async function gradeInterview(setup: InterviewSetup, transcript: Turn[]): Promise<ScorecardResult> {
+export async function gradeInterview(setup: InterviewSetup, transcript: Turn[], useAI: boolean): Promise<ScorecardResult> {
   const metrics = deliveryMetrics(transcript, setup.language);
   const answerCount = metrics.answers.length;
   if (answerCount === 0) throw new GraderError("Answer at least one question to get a scorecard.", 400);
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!useAI) {
     return { scorecard: demoScorecard(transcript, metrics), metrics, demo: true };
   }
 

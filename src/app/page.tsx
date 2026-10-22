@@ -9,7 +9,10 @@ import type { InterviewSetup } from "@/lib/types";
 const FEATURES = [
   { icon: "🎙️", title: "Real voice conversation", text: "Maya speaks her questions and listens to your spoken answers, like a real call." },
   { icon: "🧠", title: "Adapts to your answers", text: "Vague answer? Expect a follow-up. Every question is built from your CV and the job." },
-  { icon: "🌍", title: "English or Arabic", text: "Practice in the language you'll actually interview in." },
+  { icon: "💻", title: "Live coding round", text: "Solve a job-relevant problem in a real code editor and explain your approach." },
+  { icon: "📊", title: "Detailed scorecard", text: "Skills radar, filler words, speaking pace, and a stronger version of every answer." },
+  { icon: "📈", title: "Track your progress", text: "Every interview is saved to your dashboard so you can watch your scores climb." },
+  { icon: "🌍", title: "English or Arabic", text: "Practice in the language you'll actually interview in, with full right-to-left support." },
 ];
 
 export default function Home() {
@@ -18,25 +21,8 @@ export default function Home() {
   const [session, setSession] = useState(0);
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] bg-[radial-gradient(ellipse_at_top,rgba(139,92,246,0.25),transparent_65%)]" />
-
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-4 py-5 sm:px-6">
-        <button onClick={() => setSetup(null)} className="flex items-center gap-2 font-semibold">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 text-sm">IP</span>
-          InterviewPilot
-        </button>
-        <a
-          href="https://github.com/SireenZo/interviewpilot"
-          target="_blank"
-          rel="noreferrer"
-          className="text-sm text-zinc-400 hover:text-zinc-100"
-        >
-          GitHub ↗
-        </a>
-      </header>
-
-      <main className="mx-auto max-w-5xl px-4 pb-24 sm:px-6">
+    <>
+      <main className="mx-auto max-w-6xl px-4 pb-24 sm:px-6">
         {setup ? (
           <InterviewRoom
             key={session}
@@ -60,7 +46,7 @@ export default function Home() {
               </p>
             </section>
 
-            <section className="mb-12 grid gap-4 sm:grid-cols-3">
+            <section className="mb-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map((f) => (
                 <div key={f.title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                   <p className="text-2xl" aria-hidden>{f.icon}</p>
@@ -75,9 +61,6 @@ export default function Home() {
         )}
       </main>
 
-      <footer className="border-t border-white/5 py-6 text-center text-sm text-zinc-500">
-        Built with Next.js, TypeScript and Claude · Your CV and answers are never stored.
-      </footer>
-    </div>
+    </>
   );
 }

@@ -95,11 +95,14 @@ export default function ScorecardView({
   transcript,
   language,
   actions,
+  shared = false,
 }: {
   result: ScorecardResult;
   transcript: Turn[];
   language: Lang;
   actions?: React.ReactNode;
+  /** Public view for someone else's scorecard: hides prompts aimed at the owner. */
+  shared?: boolean;
 }) {
   const { scorecard: s, metrics: m } = result;
   const dir = language === "ar" ? "rtl" : "ltr";
@@ -107,9 +110,9 @@ export default function ScorecardView({
 
   return (
     <div className="animate-fade-in space-y-6">
-      {result.demo && (
+      {result.demo && !shared && (
         <p className="rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-200 print:hidden">
-          <strong>Demo scorecard:</strong> sign in to get a real AI evaluation of your answers.
+          <strong>Demo scorecard:</strong> this is sample feedback, not an AI evaluation of your answers.
         </p>
       )}
 
@@ -183,6 +186,28 @@ export default function ScorecardView({
           </ul>
         </Card>
       </div>
+
+      {s.coding && (
+        <Card title="💻 Coding round">
+          <div className="grid gap-6 md:grid-cols-[auto_minmax(0,1fr)]">
+            <div className="text-center">
+              <p className={`text-5xl font-bold tabular-nums ${tone(s.coding.score).text}`}>{s.coding.score}</p>
+              <p className="text-xs uppercase tracking-wider text-zinc-500">code score</p>
+            </div>
+            <div dir={dir} className="space-y-2 text-sm text-zinc-300">
+              <p><span className="font-semibold text-zinc-100">Correctness: </span>{s.coding.correctness}</p>
+              <p><span className="font-semibold text-zinc-100">Code quality: </span>{s.coding.quality}</p>
+              <p><span className="font-semibold text-zinc-100">Explanation: </span>{s.coding.communication}</p>
+            </div>
+          </div>
+          <details className="mt-4">
+            <summary className="cursor-pointer text-sm font-medium text-violet-300">Show a reference solution</summary>
+            <pre className="mt-3 overflow-x-auto rounded-xl bg-black/40 p-4 text-xs leading-relaxed text-zinc-200" dir="ltr">
+              <code>{s.coding.suggestedSolution}</code>
+            </pre>
+          </details>
+        </Card>
+      )}
 
       <Card title="Answer by answer">
         <ol className="space-y-4">

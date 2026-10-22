@@ -47,6 +47,16 @@ export const ScorecardSchema = z.object({
   strengths: z.array(z.string()).describe("Top 3 strengths, each one short sentence."),
   improvements: z.array(z.string()).describe("Top 3 things to improve, each one short, actionable sentence."),
   practicePlan: z.array(z.string()).describe("3 specific practice exercises for the next week."),
+  coding: z
+    .object({
+      score: Score,
+      correctness: z.string().describe("Does it solve the problem, including edge cases? One or two sentences."),
+      quality: z.string().describe("Readability, naming, structure, complexity. One or two sentences."),
+      communication: z.string().describe("How well they explained their approach. One sentence."),
+      suggestedSolution: z.string().describe("A clean reference solution in the same language, as code only."),
+    })
+    .nullable()
+    .describe("Review of the live coding exercise, or null if there was none."),
 });
 
 export type Scorecard = z.infer<typeof ScorecardSchema>;
@@ -79,6 +89,7 @@ export function normalizeScorecard(s: Scorecard, answerCount: number): Scorecard
     strengths: s.strengths.slice(0, 3),
     improvements: s.improvements.slice(0, 3),
     practicePlan: s.practicePlan.slice(0, 3),
+    coding: s.coding ? { ...s.coding, score: clamp(s.coding.score) } : null,
   };
 }
 

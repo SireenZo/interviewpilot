@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useSpeaker } from "@/hooks/useSpeaker";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
-import type { InterviewSetup, Turn } from "@/lib/types";
+import { plannedSteps, type InterviewSetup, type Turn } from "@/lib/types";
+import CodingPanel from "./CodingPanel";
 import InterviewResult from "./InterviewResult";
 import Transcript from "./Transcript";
 import Orb, { type OrbState } from "./Orb";
 
-type Phase = "thinking" | "speaking" | "answering" | "error" | "done";
+type Phase = "thinking" | "speaking" | "answering" | "coding" | "error" | "done";
 
 function formatTime(seconds: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -29,6 +30,7 @@ export default function InterviewRoom({ setup, onExit }: { setup: InterviewSetup
   const [draft, setDraft] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(0);
+  const [demoMode, setDemoMode] = useState(false);
 
   const endedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -40,6 +42,8 @@ export default function InterviewRoom({ setup, onExit }: { setup: InterviewSetup
   const voiceInput = recognizer.supported && !typing;
   const lastQuestion = [...transcript].reverse().find((t) => t.role === "interviewer")?.text ?? "";
   const asked = transcript.filter((t) => t.role === "interviewer").length + (live ? 1 : 0);
+  const steps = plannedSteps(setup);
+  const codingTask = [...transcript].reverse().find((t) => t.coding)?.coding;
 
   async function interviewerTurn(history: Turn[]) {
     retryRef.current = history;
@@ -71,7 +75,31 @@ export default function InterviewRoom({ setup, onExit }: { setup: InterviewSetup
       return;
     }
 
-    const final = res.headers.get("X-Interview-Final") === "1";
+    const kind = res.headers.get("X-Turn-Kind");
+    setDemoMode(res.headers.get("X-Mode") === "demo");
+
+    // The coding exercise arrives as JSON: speak the intro, then open the editor.
+    if (kind === "coding") {
+      let turn: Turn;
+      try {
+        turn = (await res.json()).turn;
+      } catch {
+        if (stale()) return;
+        setNotice("Couldn't load the coding exercise. Please try again.");
+        setPhase("error");
+        return;
+      }
+      if (stale()) return;
+      setTranscript([...history, turn]);
+      setPhase("speaking");
+      speaker.say(turn.text);
+      await speaker.whenIdle();
+      if (stale()) return;
+      setPhase("coding");
+      return;
+    }
+
+    const final = kind === "closing";
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     const speech = speaker.begin();
@@ -125,6 +153,13 @@ export default function InterviewRoom({ setup, onExit }: { setup: InterviewSetup
       ? { role: "candidate", text: answer, mode: "text" }
       : { role: "candidate", text: answer, mode: "voice", durationSec: Math.round((Date.now() - answerStartRef.current) / 1000) };
     interviewerTurn([...transcript, answerTurn]);
+  }
+
+  function submitCode(code: string, explanation: string) {
+    interviewerTurn([
+      ...transcript,
+      { role: "candidate", text: explanation || "(No explanation given.)", mode: "text", code },
+    ]);
   }
 
   function toggleTyping() {
@@ -198,12 +233,12 @@ export default function InterviewRoom({ setup, onExit }: { setup: InterviewSetup
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8 py-6">
+    <div className={`mx-auto flex flex-col gap-8 py-6 ${phase === "coding" ? "max-w-6xl" : "max-w-3xl"}`}>
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
         <div className="flex items-center gap-3">
           <span className="rounded-full bg-white/5 px-3 py-1 font-medium tabular-nums text-zinc-300">⏱ {formatTime(seconds)}</span>
           <span className="text-zinc-400">
-            Question {Math.max(1, Math.min(asked, setup.questionCount))} of {setup.questionCount}
+            {codingTask && phase === "coding" ? "Coding round" : `Question ${Math.max(1, Math.min(asked, steps))} of ${steps}`}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -221,13 +256,24 @@ export default function InterviewRoom({ setup, onExit }: { setup: InterviewSetup
           </button>
         </div>
       </div>
+      {demoMode && (
+        <p className="-mt-4 rounded-xl border border-violet-400/20 bg-violet-500/10 px-4 py-2 text-center text-sm text-violet-200">
+          Demo interview: Maya follows a script. <a href="/signin?callbackUrl=/" className="font-semibold underline">Sign in</a> for a real AI interviewer.
+        </p>
+      )}
       <div className="h-1 overflow-hidden rounded-full bg-white/5">
         <div
           className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-700"
-          style={{ width: `${(Math.min(asked, setup.questionCount) / setup.questionCount) * 100}%` }}
+          style={{ width: `${(Math.min(asked, steps) / steps) * 100}%` }}
         />
       </div>
 
+      {phase === "coding" && codingTask ? (
+        <div className="flex items-center gap-4">
+          <Orb state="idle" size={56} />
+          <p dir={dir} className="text-zinc-300">{lastQuestion}</p>
+        </div>
+      ) : (
       <div className="flex flex-col items-center gap-6 text-center">
         <Orb state={orbState} />
         <p dir={dir} className="min-h-[5.5rem] max-w-2xl text-xl leading-relaxed text-zinc-100 sm:text-2xl">
@@ -239,6 +285,9 @@ export default function InterviewRoom({ setup, onExit }: { setup: InterviewSetup
           </button>
         )}
       </div>
+      )}
+
+      {phase === "coding" && codingTask && <CodingPanel task={codingTask} dir={dir} onSubmit={submitCode} />}
 
       {notice && (
         <p role="alert" className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-200">

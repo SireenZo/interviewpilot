@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import { aiAccess } from "@/lib/access";
 import { SAMPLE_CV } from "@/lib/demo";
 import { LIMITS } from "@/lib/types";
 
@@ -21,9 +22,9 @@ export async function POST(req: Request) {
   if (!(file instanceof File) || file.size === 0) return fail("Please choose a PDF.", 400);
   if (file.type !== "application/pdf" || file.size > LIMITS.pdfBytes) return fail("Please upload a PDF under 4 MB.", 400);
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ cvText: SAMPLE_CV, demo: true });
-  }
+  const access = await aiAccess("pdf");
+  if (access.mode === "limited") return fail(access.message, 429);
+  if (access.mode === "demo") return NextResponse.json({ cvText: SAMPLE_CV, demo: true });
 
   const client = new Anthropic();
   try {

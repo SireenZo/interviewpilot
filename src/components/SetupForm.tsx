@@ -2,13 +2,30 @@
 
 import { useState } from "react";
 import { SAMPLE_CV, SAMPLE_JOB } from "@/lib/demo";
-import type { InterviewSetup, Lang } from "@/lib/types";
+import type { InterviewSetup, InterviewType, Lang, Level } from "@/lib/types";
 
 const LENGTHS = [
   { count: 3, label: "Quick", detail: "~5 min" },
   { count: 5, label: "Standard", detail: "~10 min" },
   { count: 8, label: "Full", detail: "~20 min" },
 ];
+
+const TYPES: { value: InterviewType; label: string; detail: string }[] = [
+  { value: "mixed", label: "Mixed", detail: "Experience, technical and behavioral" },
+  { value: "behavioral", label: "Behavioral", detail: "Teamwork, conflict, ownership" },
+  { value: "technical", label: "Technical", detail: "Fundamentals, design, deep-dives" },
+];
+
+const LEVELS: { value: Level; label: string }[] = [
+  { value: "junior", label: "Junior" },
+  { value: "mid", label: "Mid-level" },
+  { value: "senior", label: "Senior" },
+];
+
+const choice = (active: boolean) =>
+  `rounded-xl border px-3 py-2.5 text-sm transition ${
+    active ? "border-violet-400/60 bg-violet-500/15 text-white" : "border-white/10 text-zinc-400 hover:border-white/20"
+  }`;
 
 const field =
   "w-full rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm leading-relaxed outline-none transition placeholder:text-zinc-500 focus:border-violet-400/60 focus:ring-4 focus:ring-violet-500/15";
@@ -19,6 +36,9 @@ export default function SetupForm({ onStart }: { onStart: (setup: InterviewSetup
   const [jobText, setJobText] = useState("");
   const [language, setLanguage] = useState<Lang>("en");
   const [questionCount, setQuestionCount] = useState(5);
+  const [interviewType, setInterviewType] = useState<InterviewType>("mixed");
+  const [level, setLevel] = useState<Level>("junior");
+  const [codingRound, setCodingRound] = useState(false);
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,7 +74,16 @@ export default function SetupForm({ onStart }: { onStart: (setup: InterviewSetup
       className="space-y-6"
       onSubmit={(e) => {
         e.preventDefault();
-        if (ready) onStart({ candidateName: name.trim(), cvText, jobText, language, questionCount });
+        if (ready) onStart({
+            candidateName: name.trim(),
+            cvText,
+            jobText,
+            language,
+            questionCount,
+            interviewType,
+            level,
+            codingRound: codingRound && interviewType !== "behavioral",
+          });
       }}
     >
       <div className="grid gap-6 lg:grid-cols-2">
@@ -144,6 +173,54 @@ export default function SetupForm({ onStart }: { onStart: (setup: InterviewSetup
           </div>
         </div>
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div>
+          <p className="mb-2 text-sm font-medium">Interview type</p>
+          <div className="grid grid-cols-3 gap-2">
+            {TYPES.map((t) => (
+              <button key={t.value} type="button" aria-pressed={interviewType === t.value} onClick={() => setInterviewType(t.value)} className={`${choice(interviewType === t.value)} text-center`}>
+                <span className="block font-medium">{t.label}</span>
+                <span className="hidden text-[11px] text-zinc-500 sm:block">{t.detail}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="mb-2 text-sm font-medium">Seniority</p>
+          <div className="grid grid-cols-3 gap-2">
+            {LEVELS.map((l) => (
+              <button key={l.value} type="button" aria-pressed={level === l.value} onClick={() => setLevel(l.value)} className={`${choice(level === l.value)} font-medium`}>
+                {l.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <label
+        className={`flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 transition ${
+          interviewType === "behavioral" ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-white/20"
+        }`}
+      >
+        <span>
+          <span className="block font-medium">💻 Live coding round</span>
+          <span className="block text-sm text-zinc-400">
+            {interviewType === "behavioral"
+              ? "Not part of behavioral interviews."
+              : "Solve a short, job-relevant problem in a code editor, then explain your approach."}
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={codingRound && interviewType !== "behavioral"}
+          disabled={interviewType === "behavioral"}
+          onChange={(e) => setCodingRound(e.target.checked)}
+          className="peer sr-only"
+        />
+        <span className="relative h-6 w-11 shrink-0 rounded-full bg-white/15 transition peer-checked:bg-violet-500 peer-focus-visible:ring-4 peer-focus-visible:ring-violet-500/30 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-5" />
+      </label>
 
       {error && <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">{error}</p>}
 
