@@ -2,6 +2,8 @@
 
 **Practice real job interviews out loud with an AI interviewer, then get scored like a hiring manager would score you.**
 
+**🔗 Live: https://interviewpilot-three.vercel.app**
+
 Maya, the AI interviewer, reads your CV and the job post, talks with you by voice, digs deeper when your answers are vague, runs a live coding round, and gives you a detailed scorecard. Every interview is saved to your dashboard so you can track your progress. Works in **English and Arabic**.
 
 [![CI](https://github.com/SireenZo/interviewpilot/actions/workflows/ci.yml/badge.svg)](https://github.com/SireenZo/interviewpilot/actions/workflows/ci.yml)
