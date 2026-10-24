@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { ChatMessage } from "./ai";
 import { nextTurnKind, type InterviewSetup, type Turn } from "./types";
 
 export const INTERVIEWER_SYSTEM = `You are Maya, a warm but rigorous senior interviewer. You are running a live, spoken job interview. Everything you write is converted to speech, so it must sound natural when read aloud.
@@ -87,8 +87,8 @@ ${turn.text}
  * Converts the transcript into Messages API turns. Each turn's wrapper is derived only from the turns
  * before it, so earlier messages never change between requests and the prompt cache keeps hitting.
  */
-export function buildMessages(setup: InterviewSetup, transcript: Turn[]): Anthropic.Beta.BetaMessageParam[] {
-  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: contextMessage(setup) }];
+export function buildMessages(setup: InterviewSetup, transcript: Turn[]): ChatMessage[] {
+  const messages: ChatMessage[] = [{ role: "user", content: contextMessage(setup) }];
   transcript.forEach((turn, i) => {
     if (turn.role === "interviewer") messages.push({ role: "assistant", content: interviewerContent(turn) });
     else messages.push({ role: "user", content: candidateContent(turn, transcript.slice(0, i + 1), setup) });

@@ -1,6 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { aiAccess } from "@/lib/access";
+import { AIError, streamChat } from "@/lib/ai";
 import { createCodingTurn } from "@/lib/coding";
 import { demoTurn } from "@/lib/demo";
 import { buildMessages, INTERVIEWER_SYSTEM } from "@/lib/prompts";
@@ -23,12 +23,7 @@ function fail(error: string, status: number) {
 }
 
 function apiFailure(error: unknown) {
-  if (error instanceof Anthropic.RateLimitError) return fail("The interviewer is busy. Please wait a moment and try again.", 429);
-  if (error instanceof Anthropic.AuthenticationError) return fail("Server API key is invalid.", 500);
-  if (error instanceof Anthropic.APIError) {
-    console.error("Anthropic API error", error.status, error.message);
-    return fail("The interviewer had a problem. Please try again.", 502);
-  }
+  if (error instanceof AIError) return fail(error.message, error.status);
   console.error(error);
   return fail("Something went wrong. Please try again.", 500);
 }
@@ -99,37 +94,20 @@ export async function POST(req: Request) {
     });
   }
 
-  const client = new Anthropic();
-  let stream;
+  let chunks: AsyncIterable<string>;
   try {
-    stream = client.beta.messages.stream({
-      model: "claude-opus-5-5",
-      max_tokens: 2000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      // Low effort keeps the voice conversation snappy; interviewer turns are short.
-      output_config: { effort: "low" },
-      cache_control: { type: "ephemeral" },
-      system: INTERVIEWER_SYSTEM,
-      messages: buildMessages(setup, transcript),
-    });
-    // Surface auth / rate-limit errors as proper HTTP errors before the response starts streaming.
-    await stream.withResponse();
+    chunks = await streamChat({ system: INTERVIEWER_SYSTEM, messages: buildMessages(setup, transcript), maxTokens: 2000 });
   } catch (error) {
     return apiFailure(error);
   }
 
   return textStream(kind, mode, async (write) => {
     let wrote = false;
-    for await (const event of stream) {
-      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-        write(event.delta.text);
-        wrote = true;
-      }
+    for await (const text of chunks) {
+      write(text);
+      wrote = true;
     }
-    const message = await stream.finalMessage();
-    if (!wrote || message.stop_reason === "refusal") {
-      write((wrote ? " " : "") + FALLBACK_LINE[setup.language]);
-    }
+    // A refusal or an empty reply should never leave the candidate in silence.
+    if (!wrote) write(FALLBACK_LINE[setup.language]);
   });
 }

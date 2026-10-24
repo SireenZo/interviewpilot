@@ -1,6 +1,7 @@
 import { and, count, eq, gte } from "drizzle-orm";
 import { auth } from "@/auth";
 import { getDb, schema } from "@/db";
+import { activeProvider } from "./ai";
 
 /** Daily per-user limits that keep a public deployment from running up the API bill. */
 export const DAILY_LIMITS = {
@@ -35,7 +36,7 @@ export async function currentUserId() {
  */
 export async function aiAccess(kind: UsageKind): Promise<Access> {
   const userId = await currentUserId();
-  if (!process.env.ANTHROPIC_API_KEY || !userId) return { mode: "demo", userId };
+  if (!activeProvider() || !userId) return { mode: "demo", userId };
 
   const db = await getDb();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);

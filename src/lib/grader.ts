@@ -1,5 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { AIError, generateObject } from "./ai";
 import { deliveryMetrics, type DeliveryMetrics } from "./metrics";
 import { normalizeScorecard, questionAnswerPairs, ScorecardSchema, type Scorecard, type ScorecardResult } from "./scorecard";
 import type { InterviewSetup, Turn } from "./types";
@@ -107,19 +106,13 @@ export async function gradeInterview(setup: InterviewSetup, transcript: Turn[], 
     return { scorecard: demoScorecard(transcript, metrics), metrics, demo: true };
   }
 
-  const client = new Anthropic();
   try {
-    const response = await client.beta.messages.parse({
-      model: "claude-opus-5-5",
-      max_tokens: 16000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { effort: "medium", format: zodOutputFormat(ScorecardSchema) },
+    const scorecard = await generateObject({
+      schema: ScorecardSchema,
+      effort: "medium",
+      maxTokens: 16000,
       system: GRADER_SYSTEM,
-      messages: [
-        {
-          role: "user",
-          content: `<job_description>
+      prompt: `<job_description>
 ${setup.jobText}
 </job_description>
 
@@ -136,20 +129,10 @@ ${formatMetrics(metrics)}
 </delivery_statistics>
 
 Grade this interview. There are ${answerCount} candidate answers (indexes 0 to ${answerCount - 1}); give feedback for every one.`,
-        },
-      ],
     });
-    if (response.stop_reason === "refusal" || !response.parsed_output) {
-      throw new GraderError("We couldn't grade this interview. Please try again.", 502);
-    }
-    return { scorecard: normalizeScorecard(response.parsed_output, answerCount), metrics, demo: false };
+    return { scorecard: normalizeScorecard(scorecard, answerCount), metrics, demo: false };
   } catch (error) {
-    if (error instanceof GraderError) throw error;
-    if (error instanceof Anthropic.RateLimitError) throw new GraderError("Too many requests. Please try again in a minute.", 429);
-    if (error instanceof Anthropic.APIError) {
-      console.error("Anthropic API error", error.status, error.message);
-      throw new GraderError("The grader had a problem. Please try again.", 502);
-    }
+    if (error instanceof AIError) throw new GraderError(error.message, error.status);
     throw error;
   }
 }
